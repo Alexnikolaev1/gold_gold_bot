@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ML artifacts (generated at runtime)
+models/
+*.pkl
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Secrets & runtime data
+.env
+.env.local
+data/ctrader_tokens.json
+data/execution_state.json
+data/logs/
+
+# Streamlit
+.streamlit/secrets.toml
