@@ -3,24 +3,16 @@ import logging
 import requests
 
 from aurum.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from aurum.telegram_bot import load_chat_id, send_message
 
 logger = logging.getLogger(__name__)
 
 
 def send_telegram_alert(message: str) -> bool:
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    chat_id = load_chat_id() or TELEGRAM_CHAT_ID
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
         return False
-    try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        resp = requests.post(
-            url,
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"},
-            timeout=10,
-        )
-        return resp.status_code == 200
-    except Exception as exc:
-        logger.warning("Telegram alert failed: %s", exc)
-        return False
+    return send_message(chat_id, message)
 
 
 def format_signal_alert(

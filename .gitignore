@@ -21,6 +21,7 @@ Thumbs.db
 .env.local
 data/ctrader_tokens.json
 data/execution_state.json
+data/telegram_chat_id.txt
 data/logs/
 
 # Streamlit
