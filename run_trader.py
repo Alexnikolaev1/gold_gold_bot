@@ -18,6 +18,7 @@ from aurum.execution.engine import ExecutionEngine
 from aurum.logging_setup import setup_logging
 from aurum.ml import models_exist, train_models
 from aurum.preflight import run_preflight
+from aurum.telegram_runner import start_telegram_bot_background
 
 logger = setup_logging("aurum.trader")
 _shutdown = False
@@ -59,6 +60,8 @@ def main() -> None:
         sys.exit(1)
 
     ensure_models()
+
+    start_telegram_bot_background()
 
     deposit = float(os.getenv("DEPOSIT", DEFAULT_DEPOSIT))
     risk_pct = float(os.getenv("RISK_PCT", DEFAULT_RISK_PCT))

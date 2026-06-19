@@ -22,6 +22,7 @@ Thumbs.db
 data/ctrader_tokens.json
 data/execution_state.json
 data/telegram_chat_id.txt
+data/telegram_offset.txt
 data/logs/
 
 # Streamlit

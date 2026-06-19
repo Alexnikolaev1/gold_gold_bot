@@ -14,6 +14,7 @@ from aurum.config import (
     MIN_BARS_FOR_FEATURES,
     MIN_DEPOSIT,
     MIN_RULES_CONSENSUS,
+    TELEGRAM_BOT_TOKEN,
     TICKER_GOLD,
 )
 from aurum.data import fetch_historical_data, fetch_realtime_data, fetch_training_data, is_comex_session_active
@@ -24,6 +25,10 @@ from aurum.risk import calculate_trade_levels, position_size_oz
 from aurum.ui.dashboard import render_performance_sidebar, render_preflight_banner
 from aurum.ui.fxpro_panel import render_fxpro_tab
 from aurum.signals import consensus_score, process_signals
+from aurum.telegram_runner import start_telegram_bot_background, telegram_bot_alive
+
+# Запуск Telegram-бота в фоне (один контейнер Railway = Streamlit + TG)
+start_telegram_bot_background()
 
 st.set_page_config(
     page_title="AURUM QUANT TERMINAL",
@@ -108,6 +113,14 @@ def main():
     risk_pct = st.sidebar.slider("Риск на сделку (%)", 0.1, 5.0, DEFAULT_RISK_PCT, 0.1)
     auto_refresh = st.sidebar.toggle("Авто-обновление", value=True)
     notify_tg = st.sidebar.toggle("Telegram-алерты", value=False)
+
+    if TELEGRAM_BOT_TOKEN:
+        if telegram_bot_alive():
+            st.sidebar.success("🤖 Telegram bot: активен — напиши /start боту")
+        else:
+            st.sidebar.error("🤖 Telegram bot: не запущен — проверь TELEGRAM_BOT_TOKEN")
+    else:
+        st.sidebar.caption("Telegram: добавь TELEGRAM_BOT_TOKEN в Railway Variables")
 
     if st.sidebar.button("ПЕРЕОБУЧИТЬ ML"):
         with st.spinner("Загрузка истории и переобучение..."):
