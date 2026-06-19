@@ -1,14 +1,13 @@
 import logging
 
-import requests
-
 from aurum.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-from aurum.telegram_bot import load_chat_id, send_message
 
 logger = logging.getLogger(__name__)
 
 
 def send_telegram_alert(message: str) -> bool:
+    from aurum.telegram_bot import load_chat_id, send_message
+
     chat_id = load_chat_id() or TELEGRAM_CHAT_ID
     if not TELEGRAM_BOT_TOKEN or not chat_id:
         return False
@@ -24,11 +23,43 @@ def format_signal_alert(
     sl: float,
     oz: float,
 ) -> str:
-    emoji = "🟢" if signal == "BUY" else "🔴"
-    return (
-        f"{emoji} <b>AURUM SIGNAL — {signal}</b>\n"
-        f"Цена: <b>${price:.2f}</b>\n"
-        f"Confidence: <b>{confidence * 100:.1f}%</b>\n"
-        f"SL: ${sl:.1f} | TP1: ${tp1:.1f} | TP2: ${tp2:.1f}\n"
-        f"Размер: {oz:.1f} oz"
+    return format_entry_alert(
+        signal=signal,
+        price=price,
+        confidence=confidence,
+        tp1=tp1,
+        tp2=tp2,
+        sl=sl,
+        oz=oz,
     )
+
+
+def format_entry_alert(
+    signal: str,
+    price: float,
+    confidence: float,
+    tp1: float,
+    tp2: float,
+    sl: float,
+    oz: float,
+    rr_tp1: float = 0.0,
+    rules_active: int = 0,
+    total_rules: int = 6,
+    bar_time: str = "",
+) -> str:
+    emoji = "🟢" if signal == "BUY" else "🔴"
+    lines = [
+        f"{emoji} <b>AURUM ENTRY — {signal}</b>",
+        f"Цена входа: <b>${price:.2f}</b>",
+        f"Confidence: <b>{confidence * 100:.1f}%</b>",
+        f"SL: <b>${sl:.1f}</b> | TP1: <b>${tp1:.1f}</b> | TP2: <b>${tp2:.1f}</b>",
+    ]
+    if rr_tp1 > 0:
+        lines.append(f"R:R → TP1: <b>{rr_tp1:.2f}</b>")
+    if rules_active > 0:
+        lines.append(f"Консенсус: <b>{rules_active}/{total_rules}</b> правил")
+    lines.append(f"Размер: <b>{oz:.2f} oz</b> (риск от депозита)")
+    if bar_time:
+        lines.append(f"Бар: {bar_time}")
+    lines.append("\n⚡ Сигнал на вход — проверьте терминал или /balance")
+    return "\n".join(lines)

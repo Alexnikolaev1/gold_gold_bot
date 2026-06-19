@@ -1,17 +1,18 @@
-"""Telegram bot — /start, /status, /balance via long polling."""
+"""Telegram bot — /start, /status, /balance via long polling + background entry alerts."""
 
 import logging
 import os
-import sys
+import threading
 import time
 
 import requests
 
-from aurum.config import DATA_DIR, TELEGRAM_CHAT_ID
+from aurum.config import DATA_DIR, DEFAULT_DEPOSIT, DEFAULT_RISK_PCT, TELEGRAM_ALERTS_ENABLED, TELEGRAM_CHAT_ID, TOTAL_RULES
 from aurum.data import fetch_realtime_data, is_comex_session_active
 from aurum.execution.state import StateStore
 from aurum.features import calculate_indicators
 from aurum.ml import models_exist
+from aurum.risk import calculate_trade_levels, position_size_oz
 from aurum.signals import process_signals
 
 logger = logging.getLogger(__name__)
@@ -115,12 +116,14 @@ def send_message(chat_id: int | str, text: str, parse_mode: str = "HTML") -> boo
 
 def _welcome_text() -> str:
     _, session_msg = is_comex_session_active()
+    alerts = "включены" if TELEGRAM_ALERTS_ENABLED else "выключены"
     return (
         "⚡ <b>AURUM Gold Bot</b> активен!\n\n"
         "Команды:\n"
-        "/status — сигнал и цена\n"
+        "/status — сигнал, SL/TP\n"
         "/balance — баланс и позиция\n"
         "/help — справка\n\n"
+        f"🔔 Алерты на вход: <b>{alerts}</b> (24/7, без браузера)\n"
         f"Сессия: {session_msg}"
     )
 
@@ -134,13 +137,33 @@ def _status_text() -> str:
     feat = calculate_indicators(df)
     result = process_signals(feat)
     price = float(feat.iloc[-1]["Close"])
-    return (
-        f"📊 <b>AURUM Status</b>\n"
-        f"Цена: <b>${price:.2f}</b>\n"
-        f"Сигнал: <b>{result.signal}</b>\n"
-        f"Confidence: <b>{result.confidence * 100:.1f}%</b>\n"
-        f"Правила: {result.rules_buy}/{result.rules_sell}"
-    )
+    lines = [
+        f"📊 <b>AURUM Status</b>",
+        f"Цена: <b>${price:.2f}</b>",
+        f"Сигнал: <b>{result.signal}</b>",
+        f"Confidence: <b>{result.confidence * 100:.1f}%</b>",
+        f"Правила: {result.rules_buy}/{result.rules_sell}",
+    ]
+    if result.signal in ("BUY", "SELL"):
+        levels = calculate_trade_levels(feat, result.signal)
+        rules = result.rules_buy if result.signal == "BUY" else result.rules_sell
+        oz = position_size_oz(DEFAULT_DEPOSIT, DEFAULT_RISK_PCT, levels.risk_per_oz)
+        lines.extend(
+            [
+                f"SL: <b>${levels.sl:.1f}</b> | TP1: <b>${levels.tp1:.1f}</b> | TP2: <b>${levels.tp2:.1f}</b>",
+                f"R:R → TP1: <b>{levels.risk_reward_tp1:.2f}</b> | Консенсус: {rules}/{TOTAL_RULES}",
+                f"Размер (~${DEFAULT_DEPOSIT:.0f}, {DEFAULT_RISK_PCT}%): <b>{oz:.2f} oz</b>",
+            ]
+        )
+        from aurum.signal_alerts import evaluate_entry_opportunity
+
+        opp = evaluate_entry_opportunity()
+        lines.append(
+            "\n✅ <b>Условия входа выполнены</b> — алерт отправлен"
+            if opp and opp.side == result.signal
+            else "\n⏳ Вход: ждём confidence + консенсус + R:R"
+        )
+    return "\n".join(lines)
 
 
 def _balance_text() -> str:
@@ -227,6 +250,17 @@ def run_polling() -> bool:
     except Exception as exc:
         _log(f"Bootstrap failed: {exc}")
         return False
+
+    stop_alerts = threading.Event()
+    if TELEGRAM_ALERTS_ENABLED:
+        from aurum.signal_alerts import run_alert_loop
+
+        threading.Thread(
+            target=run_alert_loop,
+            args=(stop_alerts, _log),
+            name="aurum-signal-alerts",
+            daemon=True,
+        ).start()
 
     offset = _load_offset()
     _log(f"Polling started (offset={offset})")

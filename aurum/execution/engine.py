@@ -16,9 +16,9 @@ from aurum.config import (
 from aurum.data import fetch_realtime_data, is_comex_session_active
 from aurum.execution.state import ExecutionState, ManagedTrade, StateStore
 from aurum.features import calculate_indicators
-from aurum.notifications import format_signal_alert, send_telegram_alert
 from aurum.risk import calculate_trade_levels, position_size_oz
 from aurum.signals import process_signals
+from aurum.signal_alerts import EntryOpportunity, send_entry_alert
 
 logger = logging.getLogger(__name__)
 
@@ -204,8 +204,20 @@ class ExecutionEngine:
             f"OPEN {trade.side} @ {trade.entry_price:.2f} | "
             f"SL={levels.sl} TP1={levels.tp1} TP2={levels.tp2} | {oz:.2f}oz | R:R={levels.risk_reward_tp1:.2f}",
         )
-        send_telegram_alert(
-            format_signal_alert(trade.side, trade.entry_price, trade.confidence, levels.tp1, levels.tp2, levels.sl, oz)
+        rules_active = signal_result.rules_buy if trade.side == "BUY" else signal_result.rules_sell
+        send_entry_alert(
+            EntryOpportunity(
+                side=trade.side,
+                price=trade.entry_price,
+                confidence=trade.confidence,
+                tp1=levels.tp1,
+                tp2=levels.tp2,
+                sl=levels.sl,
+                oz=oz,
+                rr_tp1=levels.risk_reward_tp1,
+                bar_time=bar_time,
+                rules_active=rules_active,
+            )
         )
         summary["action"] = f"opened_{trade.side.lower()}"
         self.store.save(self.state)

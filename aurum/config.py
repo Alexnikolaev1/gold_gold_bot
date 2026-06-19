@@ -70,6 +70,8 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 # UI / worker
 AUTO_REFRESH_SEC = int(os.getenv("AUTO_REFRESH_SEC", "300"))
 TRADER_LOOP_SEC = int(os.getenv("TRADER_LOOP_SEC", "300"))
+SIGNAL_ALERT_INTERVAL_SEC = int(os.getenv("SIGNAL_ALERT_INTERVAL_SEC", os.getenv("TRADER_LOOP_SEC", "300")))
+TELEGRAM_ALERTS_ENABLED = os.getenv("TELEGRAM_ALERTS_ENABLED", "true").lower() == "true"
 
 FEATURE_COLS = [
     "RSI",

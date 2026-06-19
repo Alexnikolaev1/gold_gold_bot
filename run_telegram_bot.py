@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Telegram bot worker — responds to /start, /status, /balance."""
+"""Telegram bot worker — commands + 24/7 entry alerts (no browser needed)."""
 
 import os
 import sys

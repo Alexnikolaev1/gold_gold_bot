@@ -6,14 +6,14 @@ from aurum import __version__
 from aurum.backtest import run_backtest, run_backtest_sweep
 from aurum.chart import generate_chart, generate_equity_chart
 from aurum.config import (
-    AUTO_REFRESH_SEC,
-    CONFIDENCE_THRESHOLD,
     CONFIDENCE_LOOKBACK,
+    CONFIDENCE_THRESHOLD,
     DEFAULT_DEPOSIT,
     DEFAULT_RISK_PCT,
     MIN_BARS_FOR_FEATURES,
     MIN_DEPOSIT,
     MIN_RULES_CONSENSUS,
+    TELEGRAM_ALERTS_ENABLED,
     TELEGRAM_BOT_TOKEN,
     TICKER_GOLD,
 )
@@ -109,7 +109,11 @@ def main():
     )
     risk_pct = st.sidebar.slider("Риск на сделку (%)", 0.1, 5.0, DEFAULT_RISK_PCT, 0.1)
     auto_refresh = st.sidebar.toggle("Авто-обновление", value=True)
-    notify_tg = st.sidebar.toggle("Telegram-алерты", value=False)
+    notify_tg = False
+    if TELEGRAM_ALERTS_ENABLED:
+        st.sidebar.info("🔔 Telegram-алерты: 24/7 через бот-процесс (без браузера)")
+    else:
+        notify_tg = st.sidebar.toggle("Telegram-алерты (legacy)", value=False)
 
     if TELEGRAM_BOT_TOKEN:
         chat = load_chat_id()
@@ -160,7 +164,7 @@ def main():
 
     oz = position_size_oz(deposit, risk_pct, levels.risk_per_oz) if signal in ("BUY", "SELL") else 0.0
 
-    if notify_tg and signal in ("BUY", "SELL") and confidence >= CONFIDENCE_THRESHOLD:
+    if not TELEGRAM_ALERTS_ENABLED and notify_tg and signal in ("BUY", "SELL") and confidence >= CONFIDENCE_THRESHOLD:
         last_key = f"last_alert_{signal}"
         last_price = st.session_state.get(last_key, 0)
         if abs(price - last_price) > 1.0:
