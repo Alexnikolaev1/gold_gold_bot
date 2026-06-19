@@ -30,12 +30,39 @@ def _log(msg: str) -> None:
     print(f"[AURUM TG] {msg}", flush=True)
 
 
-def _api(method: str, **params) -> dict:
+def _proxies() -> dict[str, str] | None:
+    proxy = os.getenv("TELEGRAM_PROXY", "").strip() or os.getenv("HTTPS_PROXY", "").strip()
+    if not proxy:
+        return None
+    return {"http": proxy, "https": proxy}
+
+
+def _request_kwargs(read_timeout: float) -> dict:
+    kwargs: dict = {"timeout": (5, read_timeout)}
+    proxies = _proxies()
+    if proxies:
+        kwargs["proxies"] = proxies
+    return kwargs
+
+
+def _network_hint(exc: Exception) -> str:
+    msg = str(exc).lower()
+    if "getaddrinfo failed" in msg or "name resolution" in msg or "failed to resolve" in msg:
+        return (
+            "api.telegram.org недоступен (DNS/блокировка). "
+            "Локально: включите VPN или задайте TELEGRAM_PROXY=socks5://127.0.0.1:1080"
+        )
+    if _proxies():
+        return "Проверьте TELEGRAM_PROXY / HTTPS_PROXY — прокси не отвечает."
+    return "Проверьте интернет и доступ к api.telegram.org."
+
+
+def _api(method: str, *, read_timeout: float = 35, **params) -> dict:
     token = _token()
     if not token:
         return {"ok": False}
     url = f"https://api.telegram.org/bot{token}/{method}"
-    resp = requests.get(url, params=params, timeout=35)
+    resp = requests.get(url, params=params, **_request_kwargs(read_timeout))
     resp.raise_for_status()
     return resp.json()
 
@@ -43,7 +70,7 @@ def _api(method: str, **params) -> dict:
 def _api_post(method: str, **payload) -> dict:
     token = _token()
     url = f"https://api.telegram.org/bot{token}/{method}"
-    resp = requests.post(url, json=payload, timeout=15)
+    resp = requests.post(url, json=payload, **_request_kwargs(15))
     resp.raise_for_status()
     return resp.json()
 
@@ -175,7 +202,16 @@ def _bootstrap() -> None:
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN not set")
 
-    me = _api("getMe")
+    proxy = _proxies()
+    if proxy:
+        _log(f"Using proxy: {proxy['https']}")
+    _log("Connecting to api.telegram.org (getMe)...")
+
+    try:
+        me = _api("getMe", read_timeout=10)
+    except Exception as exc:
+        raise RuntimeError(f"{_network_hint(exc)} ({exc})") from exc
+
     if not me.get("ok"):
         raise RuntimeError(f"Invalid bot token: {me}")
     username = me["result"].get("username", "?")
@@ -185,19 +221,19 @@ def _bootstrap() -> None:
     _log(f"Webhook cleared: {wh.get('ok')}")
 
 
-def run_polling() -> None:
+def run_polling() -> bool:
     try:
         _bootstrap()
     except Exception as exc:
         _log(f"Bootstrap failed: {exc}")
-        return
+        return False
 
     offset = _load_offset()
     _log(f"Polling started (offset={offset})")
 
     while True:
         try:
-            data = _api("getUpdates", offset=offset, timeout=30)
+            data = _api("getUpdates", offset=offset, timeout=30, read_timeout=40)
             if not data.get("ok"):
                 _log(f"getUpdates error: {data}")
                 time.sleep(5)
