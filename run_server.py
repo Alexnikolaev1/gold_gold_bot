@@ -28,6 +28,22 @@ def main() -> None:
     print(f"[AURUM] TELEGRAM_BOT_TOKEN={'set ' + _mask_token(token) if token else 'NOT SET'}", flush=True)
     print("=" * 50, flush=True)
 
+    print("[AURUM] Ensuring ML models (required for /status and alerts)...", flush=True)
+    try:
+        from aurum.ml import ensure_models
+
+        meta = ensure_models()
+        if meta:
+            print(
+                f"[AURUM] ML ready: {meta.samples} bars | "
+                f"buy={meta.buy_precision:.0%} sell={meta.sell_precision:.0%}",
+                flush=True,
+            )
+        else:
+            print("[AURUM] WARNING: ML training failed — open terminal once or check Yahoo data", flush=True)
+    except Exception as exc:
+        print(f"[AURUM] WARNING: ML setup error: {exc}", flush=True)
+
     telegram_proc = None
     if token:
         telegram_proc = subprocess.Popen(

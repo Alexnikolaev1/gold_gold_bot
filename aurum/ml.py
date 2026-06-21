@@ -2,6 +2,7 @@ import pickle
 from dataclasses import dataclass
 from pathlib import Path
 
+import logging
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
@@ -19,6 +20,8 @@ from aurum.config import (
     TARGET_HORIZON_BARS,
 )
 from aurum.features import calculate_indicators
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -114,6 +117,27 @@ def train_models(df: pd.DataFrame) -> ModelMeta:
         pickle.dump(meta, f)
 
     clear_model_cache()
+    return meta
+
+
+def ensure_models() -> ModelMeta | None:
+    """Train ML models if missing (Railway / fresh deploy / telegram worker)."""
+    if models_exist():
+        return load_meta()
+    from aurum.data import fetch_training_data
+
+    logger.info("ML models missing — fetching history and training...")
+    df = fetch_training_data()
+    if df.empty:
+        logger.error("Cannot train ML: no market data from Yahoo Finance")
+        return None
+    meta = train_models(df)
+    logger.info(
+        "ML trained on %d bars | buy_prec=%.1f%% sell_prec=%.1f%%",
+        meta.samples,
+        meta.buy_precision * 100,
+        meta.sell_precision * 100,
+    )
     return meta
 
 

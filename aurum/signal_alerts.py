@@ -169,6 +169,8 @@ def scan_and_alert() -> bool:
     """One alert scan cycle. Returns True if alert was sent."""
     from aurum.telegram_bot import load_chat_id
 
+    if not models_exist():
+        return False
     if not load_chat_id():
         return False
     opp = evaluate_entry_opportunity()
@@ -185,9 +187,25 @@ def run_alert_loop(stop_event: threading.Event, log_fn=None) -> None:
         return
 
     _log(f"Signal alert worker started (interval={SIGNAL_ALERT_INTERVAL_SEC}s)")
+    warned_no_models = False
+    warned_no_chat = False
     while not stop_event.is_set():
         try:
-            scan_and_alert()
+            from aurum.telegram_bot import load_chat_id
+
+            if not models_exist():
+                if not warned_no_models:
+                    _log("Alerts paused: ML models not ready")
+                    warned_no_models = True
+            elif not load_chat_id():
+                if not warned_no_chat:
+                    _log("Alerts paused: send /start to register chat")
+                    warned_no_chat = True
+            else:
+                warned_no_models = False
+                warned_no_chat = False
+                if scan_and_alert():
+                    _log("Entry alert sent")
         except Exception as exc:
             logger.exception("Alert scan failed: %s", exc)
             if log_fn:

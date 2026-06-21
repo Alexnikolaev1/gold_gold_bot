@@ -13,10 +13,9 @@ import sys
 import time
 
 from aurum.config import DEFAULT_DEPOSIT, DEFAULT_RISK_PCT, TRADER_LOOP_SEC, TRADING_MODE
-from aurum.data import fetch_training_data
 from aurum.execution.engine import ExecutionEngine
 from aurum.logging_setup import setup_logging
-from aurum.ml import models_exist, train_models
+from aurum.ml import ensure_models
 from aurum.preflight import run_preflight
 from aurum.telegram_runner import start_telegram_bot_background
 
@@ -28,17 +27,6 @@ def _handle_signal(signum, frame):
     global _shutdown
     logger.info("Shutdown signal received (%s)", signum)
     _shutdown = True
-
-
-def ensure_models() -> None:
-    if models_exist():
-        return
-    logger.info("Training ML models...")
-    df = fetch_training_data()
-    if df.empty:
-        raise RuntimeError("Cannot fetch training data")
-    train_models(df)
-    logger.info("Models trained")
 
 
 def main() -> None:
@@ -59,7 +47,9 @@ def main() -> None:
         logger.error("Critical preflight checks failed. Aborting.")
         sys.exit(1)
 
-    ensure_models()
+    if not ensure_models():
+        logger.error("ML training failed. Aborting.")
+        sys.exit(1)
 
     start_telegram_bot_background()
 
