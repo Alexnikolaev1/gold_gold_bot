@@ -96,6 +96,18 @@ def fetch_realtime_data() -> pd.DataFrame:
     return _fetch_aligned(start_dt, end_dt, BAR_INTERVAL)
 
 
+def fetch_analysis_data() -> pd.DataFrame:
+    """Market data with enough bars for 200-period indicators (alerts, /status, trader)."""
+    end_dt = datetime.datetime.now()
+    start_dt = end_dt - datetime.timedelta(days=HIST_DAYS)
+    df = _fetch_aligned(start_dt, end_dt, BAR_INTERVAL)
+    if not df.empty and len(df) >= 50:
+        return df
+    logger.warning("Analysis data sparse (%d bars), retrying extended window", len(df))
+    start_dt = end_dt - datetime.timedelta(days=max(HIST_DAYS, 60))
+    return _fetch_aligned(start_dt, end_dt, BAR_INTERVAL)
+
+
 def is_comex_session_active(ts: datetime.datetime | None = None) -> tuple[bool, str]:
     """COMEX gold electronic session ~ Sun 18:00 ET – Fri 17:00 ET."""
     ts = ts or datetime.datetime.now(datetime.timezone.utc)

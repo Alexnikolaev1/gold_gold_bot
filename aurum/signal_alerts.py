@@ -17,7 +17,7 @@ from aurum.config import (
     TOTAL_RULES,
     TRADE_COOLDOWN_BARS,
 )
-from aurum.data import fetch_realtime_data, is_comex_session_active
+from aurum.data import fetch_analysis_data, is_comex_session_active
 from aurum.execution.state import StateStore
 from aurum.features import calculate_indicators
 from aurum.ml import models_exist
@@ -92,11 +92,15 @@ def evaluate_entry_opportunity(
     if not models_exist():
         return None
 
-    df = fetch_realtime_data()
+    df = fetch_analysis_data()
     if df.empty or len(df) < MIN_BARS_FOR_FEATURES:
         return None
 
     df_feat = calculate_indicators(df)
+    if df_feat.empty or len(df_feat) < 50:
+        logger.debug("Indicators empty after dropna (raw bars=%d)", len(df))
+        return None
+
     bar_time = str(df_feat.index[-1])
     price = float(df_feat.iloc[-1]["Close"])
 
@@ -189,6 +193,7 @@ def run_alert_loop(stop_event: threading.Event, log_fn=None) -> None:
     _log(f"Signal alert worker started (interval={SIGNAL_ALERT_INTERVAL_SEC}s)")
     warned_no_models = False
     warned_no_chat = False
+    warned_no_data = False
     while not stop_event.is_set():
         try:
             from aurum.telegram_bot import load_chat_id
@@ -204,8 +209,27 @@ def run_alert_loop(stop_event: threading.Event, log_fn=None) -> None:
             else:
                 warned_no_models = False
                 warned_no_chat = False
-                if scan_and_alert():
+                sent = scan_and_alert()
+                if sent:
                     _log("Entry alert sent")
+                    warned_no_data = False
+                elif not warned_no_data:
+                    session_ok, session_msg = is_comex_session_active()
+                    if session_ok:
+                        df = fetch_analysis_data()
+                        feat = calculate_indicators(df) if not df.empty else df
+                        if df.empty or feat.empty:
+                            _log(
+                                f"Alerts scanning (no entry yet). Market data: {len(df)} bars — "
+                                "waiting for Yahoo/COMEX data"
+                            )
+                            warned_no_data = True
+                        else:
+                            _log("Alerts scanning — no entry signal on current bar (HOLD or filters)")
+                            warned_no_data = True
+                    else:
+                        _log(f"Alerts paused: {session_msg}")
+                        warned_no_data = True
         except Exception as exc:
             logger.exception("Alert scan failed: %s", exc)
             if log_fn:

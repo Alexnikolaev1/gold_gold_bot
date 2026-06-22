@@ -58,7 +58,10 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
     vol_ma = volume.rolling(20).mean().replace(0, np.nan)
     df["Vol_Ratio"] = volume / vol_ma
 
-    return df.dropna()
+    result = df.dropna()
+    if result.empty:
+        return pd.DataFrame()
+    return result
 
 
 def _volume_profile(close: pd.Series, volume: pd.Series, window: int = 100) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

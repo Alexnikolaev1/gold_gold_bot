@@ -8,7 +8,7 @@ import time
 import requests
 
 from aurum.config import DATA_DIR, DEFAULT_DEPOSIT, DEFAULT_RISK_PCT, TELEGRAM_ALERTS_ENABLED, TELEGRAM_CHAT_ID, TOTAL_RULES
-from aurum.data import fetch_realtime_data, is_comex_session_active
+from aurum.data import fetch_analysis_data, is_comex_session_active
 from aurum.execution.state import StateStore
 from aurum.features import calculate_indicators
 from aurum.ml import models_exist
@@ -135,10 +135,12 @@ def _status_text() -> str:
             "Перезапустите сервер — бот обучит их автоматически (2–3 мин).\n"
             "Или откройте веб-терминал один раз."
         )
-    df = fetch_realtime_data()
+    df = fetch_analysis_data()
     if df.empty or len(df) < 200:
         return "⚠️ Нет данных по золоту. Подождите открытия сессии."
     feat = calculate_indicators(df)
+    if feat.empty:
+        return "⚠️ Недостаточно данных для индикаторов. Повторите через несколько минут."
     result = process_signals(feat)
     price = float(feat.iloc[-1]["Close"])
     lines = [

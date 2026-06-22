@@ -13,7 +13,7 @@ from aurum.config import (
     TRADE_COOLDOWN_BARS,
     TRADING_MODE,
 )
-from aurum.data import fetch_realtime_data, is_comex_session_active
+from aurum.data import fetch_analysis_data, is_comex_session_active
 from aurum.execution.state import ExecutionState, ManagedTrade, StateStore
 from aurum.features import calculate_indicators
 from aurum.risk import calculate_trade_levels, position_size_oz
@@ -109,13 +109,18 @@ class ExecutionEngine:
             self.store.save(self.state)
             return summary
 
-        df = fetch_realtime_data()
+        df = fetch_analysis_data()
         if df.empty or len(df) < 200:
             self.store.log(self.state, "Insufficient market data")
             self.store.save(self.state)
             return summary
 
         df_feat = calculate_indicators(df)
+        if df_feat.empty:
+            self.store.log(self.state, "Indicators unavailable (sparse market data)")
+            self.store.save(self.state)
+            return summary
+
         bar_time = str(df_feat.index[-1])
         current_price = float(df_feat.iloc[-1]["Close"])
 
