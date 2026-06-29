@@ -7,8 +7,18 @@ import time
 
 import requests
 
-from aurum.config import DATA_DIR, DEFAULT_DEPOSIT, DEFAULT_RISK_PCT, TELEGRAM_ALERTS_ENABLED, TELEGRAM_CHAT_ID, TOTAL_RULES
+from aurum.config import (
+    DATA_DIR,
+    DEFAULT_DEPOSIT,
+    DEFAULT_RISK_PCT,
+    HASHHEDGE_SCAN_BATCH,
+    SIGNAL_ALERT_INTERVAL_SEC,
+    TELEGRAM_ALERTS_ENABLED,
+    TELEGRAM_CHAT_ID,
+    TOTAL_RULES,
+)
 from aurum.data import fetch_analysis_data, is_comex_session_active
+from aurum.hashhedge import load_hashhedge_symbols
 from aurum.execution.state import StateStore
 from aurum.features import calculate_indicators
 from aurum.ml import models_exist
@@ -117,14 +127,17 @@ def send_message(chat_id: int | str, text: str, parse_mode: str = "HTML") -> boo
 def _welcome_text() -> str:
     _, session_msg = is_comex_session_active()
     alerts = "включены" if TELEGRAM_ALERTS_ENABLED else "выключены"
+    n_coins = len(load_hashhedge_symbols())
     return (
         "⚡ <b>AURUM Gold Bot</b> активен!\n\n"
         "Команды:\n"
-        "/status — сигнал, SL/TP\n"
+        "/status — золото XAU\n"
+        "/coins — список Hash Hedge\n"
         "/balance — баланс и позиция\n"
         "/help — справка\n\n"
-        f"🔔 Алерты на вход: <b>{alerts}</b> (24/7, без браузера)\n"
-        f"Сессия: {session_msg}"
+        f"🔔 Алерты Hash Hedge: <b>{alerts}</b> ({n_coins} ликвидных активов)\n"
+        f"Порог: gold ML ≥90%/3 правил | crypto ≥95%/4 правил\n"
+        f"Сессия XAU: {session_msg}"
     )
 
 
@@ -161,13 +174,14 @@ def _status_text() -> str:
                 f"Размер (~${DEFAULT_DEPOSIT:.0f}, {DEFAULT_RISK_PCT}%): <b>{oz:.2f} oz</b>",
             ]
         )
+        from aurum.entry_filters import passes_strong_entry
         from aurum.signal_alerts import evaluate_entry_opportunity
 
-        opp = evaluate_entry_opportunity()
+        opp = evaluate_entry_opportunity("XAU")
         lines.append(
-            "\n✅ <b>Условия входа выполнены</b> — алерт отправлен"
-            if opp and opp.side == result.signal
-            else "\n⏳ Вход: ждём confidence + консенсус + R:R"
+            "\n✅ <b>Условия макс. уверенности выполнены</b> — алерт отправлен"
+            if opp and opp.side == result.signal and passes_strong_entry(result, use_ml=True)
+            else "\n⏳ Вход: ждём максимальную уверенность (confidence + консенсус + R:R)"
         )
     return "\n".join(lines)
 
@@ -189,6 +203,21 @@ def _balance_text() -> str:
     return "\n".join(lines)
 
 
+def _coins_text() -> str:
+    symbols = load_hashhedge_symbols()
+    preview = ", ".join(symbols[:20])
+    rest = len(symbols) - 20
+    tail = f"\n... и ещё {rest}" if rest > 0 else ""
+    return (
+        f"📋 <b>Hash Hedge — {len(symbols)} активов</b> (только ликвидные)\n"
+        f"{preview}{tail}\n\n"
+        f"Скан: {HASHHEDGE_SCAN_BATCH} / {SIGNAL_ALERT_INTERVAL_SEC}s\n"
+        "Gold XAU: ML ≥90%, 3/6 правил, R:R≥1.2\n"
+        "Crypto: ≥95%, 4/6 правил, ≤1 против, R:R≥1.5\n"
+        "Микро-альты и ненадёжные тикеры исключены."
+    )
+
+
 def handle_command(text: str, chat_id: int) -> str:
     cmd = text.strip().split()[0].lower().split("@")[0]
     if cmd == "/start":
@@ -196,13 +225,16 @@ def handle_command(text: str, chat_id: int) -> str:
         return _welcome_text()
     if cmd == "/status":
         return _status_text()
+    if cmd == "/coins":
+        return _coins_text()
     if cmd == "/balance":
         return _balance_text()
     if cmd == "/help":
         return (
             "<b>AURUM Bot</b>\n"
             "/start — регистрация\n"
-            "/status — сигнал\n"
+            "/status — золото XAU\n"
+            "/coins — монеты Hash Hedge\n"
             "/balance — баланс\n"
             "/help — справка"
         )

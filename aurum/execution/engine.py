@@ -18,6 +18,8 @@ from aurum.execution.state import ExecutionState, ManagedTrade, StateStore
 from aurum.features import calculate_indicators
 from aurum.risk import calculate_trade_levels, position_size_oz
 from aurum.signals import process_signals
+from aurum.thresholds import get_entry_thresholds, passes_strong_entry
+from aurum.hashhedge import hashhedge_pair_label
 from aurum.signal_alerts import EntryOpportunity, send_entry_alert
 
 logger = logging.getLogger(__name__)
@@ -144,7 +146,7 @@ class ExecutionEngine:
             self.store.save(self.state)
             return summary
 
-        signal_result = process_signals(df_feat)
+        signal_result = process_signals(df_feat, use_ml=True, include_macro=True)
         self.state.last_signal_bar = bar_time
 
         if signal_result.signal not in ("BUY", "SELL"):
@@ -152,17 +154,18 @@ class ExecutionEngine:
             self.store.save(self.state)
             return summary
 
-        if signal_result.confidence < CONFIDENCE_THRESHOLD:
+        if not passes_strong_entry(signal_result, use_ml=True):
             self.store.log(
                 self.state,
-                f"Filtered {signal_result.signal} | conf={signal_result.confidence:.1%} < {CONFIDENCE_THRESHOLD:.0%}",
+                f"Filtered {signal_result.signal} | conf={signal_result.confidence:.1%} (not max confidence)",
             )
             self.store.save(self.state)
             return summary
 
         levels = calculate_trade_levels(df_feat, signal_result.signal)
-        if levels.risk_reward_tp1 < MIN_RR_TP1:
-            self.store.log(self.state, f"Rejected: R:R {levels.risk_reward_tp1:.2f} < {MIN_RR_TP1}")
+        min_rr = get_entry_thresholds(use_ml=True).min_rr
+        if levels.risk_reward_tp1 < min_rr:
+            self.store.log(self.state, f"Rejected: R:R {levels.risk_reward_tp1:.2f} < {min_rr}")
             self.store.save(self.state)
             return summary
 
@@ -212,16 +215,19 @@ class ExecutionEngine:
         rules_active = signal_result.rules_buy if trade.side == "BUY" else signal_result.rules_sell
         send_entry_alert(
             EntryOpportunity(
+                symbol="XAU",
+                pair=hashhedge_pair_label("XAU"),
                 side=trade.side,
                 price=trade.entry_price,
                 confidence=trade.confidence,
                 tp1=levels.tp1,
                 tp2=levels.tp2,
                 sl=levels.sl,
-                oz=oz,
+                size=oz,
                 rr_tp1=levels.risk_reward_tp1,
                 bar_time=bar_time,
                 rules_active=rules_active,
+                use_ml=True,
             )
         )
         summary["action"] = f"opened_{trade.side.lower()}"

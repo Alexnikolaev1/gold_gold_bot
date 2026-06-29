@@ -31,6 +31,16 @@ MIN_RULES_CONSENSUS = int(os.getenv("MIN_RULES_CONSENSUS", "3"))
 CONFIDENCE_LOOKBACK = int(os.getenv("CONFIDENCE_LOOKBACK", "500"))
 TOTAL_RULES = 6
 
+# Stricter filters for crypto (technical scoring — not equivalent to gold ML)
+CRYPTO_CONFIDENCE_THRESHOLD = float(os.getenv("CRYPTO_CONFIDENCE_THRESHOLD", "0.95"))
+CRYPTO_MIN_RULES_CONSENSUS = int(os.getenv("CRYPTO_MIN_RULES_CONSENSUS", "4"))
+CRYPTO_MAX_OPPOSING_RULES = int(os.getenv("CRYPTO_MAX_OPPOSING_RULES", "1"))
+CRYPTO_MIN_CONF_GAP = float(os.getenv("CRYPTO_MIN_CONF_GAP", "0.05"))
+CRYPTO_MIN_RR_TP1 = float(os.getenv("CRYPTO_MIN_RR_TP1", "1.5"))
+GOLD_MAX_OPPOSING_RULES = int(os.getenv("GOLD_MAX_OPPOSING_RULES", "2"))
+GOLD_MIN_CONF_GAP = float(os.getenv("GOLD_MIN_CONF_GAP", "0.02"))
+MIN_FEAT_BARS_ALERT = int(os.getenv("MIN_FEAT_BARS_ALERT", "100"))
+
 # Trade parameters
 TARGET_HORIZON_BARS = 6
 COST_POINTS = 0.15
@@ -72,6 +82,8 @@ AUTO_REFRESH_SEC = int(os.getenv("AUTO_REFRESH_SEC", "300"))
 TRADER_LOOP_SEC = int(os.getenv("TRADER_LOOP_SEC", "300"))
 SIGNAL_ALERT_INTERVAL_SEC = int(os.getenv("SIGNAL_ALERT_INTERVAL_SEC", os.getenv("TRADER_LOOP_SEC", "300")))
 TELEGRAM_ALERTS_ENABLED = os.getenv("TELEGRAM_ALERTS_ENABLED", "true").lower() == "true"
+HASHHEDGE_ALERTS_ENABLED = os.getenv("HASHHEDGE_ALERTS_ENABLED", "true").lower() == "true"
+HASHHEDGE_SCAN_BATCH = int(os.getenv("HASHHEDGE_SCAN_BATCH", "20"))
 
 FEATURE_COLS = [
     "RSI",

@@ -96,16 +96,70 @@ def fetch_realtime_data() -> pd.DataFrame:
     return _fetch_aligned(start_dt, end_dt, BAR_INTERVAL)
 
 
-def fetch_analysis_data() -> pd.DataFrame:
+def fetch_analysis_data(symbol: str = "XAU") -> pd.DataFrame:
     """Market data with enough bars for 200-period indicators (alerts, /status, trader)."""
+    return fetch_asset_analysis_data(symbol)
+
+
+def fetch_asset_analysis_data(symbol: str) -> pd.DataFrame:
+    """Fetch OHLCV (+ macro for gold) for a Hash Hedge / AURUM symbol."""
+    from aurum.hashhedge import yahoo_ticker_candidates
+
     end_dt = datetime.datetime.now()
     start_dt = end_dt - datetime.timedelta(days=HIST_DAYS)
-    df = _fetch_aligned(start_dt, end_dt, BAR_INTERVAL)
+    sym = symbol.upper()
+
+    df_primary = pd.DataFrame()
+    for ticker in yahoo_ticker_candidates(sym):
+        df_primary = _download_ticker(ticker, start_dt, end_dt, BAR_INTERVAL)
+        if not df_primary.empty and len(df_primary) >= 50:
+            logger.debug("Asset %s data from %s (%d bars)", sym, ticker, len(df_primary))
+            break
+
+    if df_primary.empty:
+        return pd.DataFrame()
+
+    if sym == "XAU":
+        df = align_and_clean_data(
+            df_primary,
+            _download_ticker(TICKER_DXY, start_dt, end_dt, BAR_INTERVAL),
+            _download_ticker(TICKER_US10Y, start_dt, end_dt, BAR_INTERVAL),
+        )
+    else:
+        df = _flatten_columns(df_primary)
+        df = df[["Open", "High", "Low", "Close", "Volume"]].dropna().copy()
+        df["DXY_Close"] = df["Close"]
+        df["US10Y_Close"] = df["Close"]
+
     if not df.empty and len(df) >= 50:
         return df
-    logger.warning("Analysis data sparse (%d bars), retrying extended window", len(df))
+
+    logger.warning("Asset %s sparse (%d bars), retrying extended window", sym, len(df))
     start_dt = end_dt - datetime.timedelta(days=max(HIST_DAYS, 60))
-    return _fetch_aligned(start_dt, end_dt, BAR_INTERVAL)
+    for ticker in yahoo_ticker_candidates(sym):
+        df_primary = _download_ticker(ticker, start_dt, end_dt, BAR_INTERVAL)
+        if not df_primary.empty and len(df_primary) >= 50:
+            break
+    if df_primary.empty:
+        return pd.DataFrame()
+    if sym == "XAU":
+        return align_and_clean_data(
+            df_primary,
+            _download_ticker(TICKER_DXY, start_dt, end_dt, BAR_INTERVAL),
+            _download_ticker(TICKER_US10Y, start_dt, end_dt, BAR_INTERVAL),
+        )
+    df = _flatten_columns(df_primary)
+    df = df[["Open", "High", "Low", "Close", "Volume"]].dropna().copy()
+    df["DXY_Close"] = df["Close"]
+    df["US10Y_Close"] = df["Close"]
+    return df
+
+
+def is_asset_session_active(symbol: str, ts: datetime.datetime | None = None) -> tuple[bool, str]:
+    """Gold respects COMEX hours; crypto/metals on Hash Hedge trade 24/7."""
+    if symbol.upper() == "XAU":
+        return is_comex_session_active(ts)
+    return True, "24/7"
 
 
 def is_comex_session_active(ts: datetime.datetime | None = None) -> tuple[bool, str]:

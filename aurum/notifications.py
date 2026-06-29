@@ -46,20 +46,27 @@ def format_entry_alert(
     rules_active: int = 0,
     total_rules: int = 6,
     bar_time: str = "",
+    symbol: str = "XAU",
+    pair: str = "XAU/USDT",
+    size_label: str = "oz",
+    platform: str = "Hash Hedge",
 ) -> str:
     emoji = "🟢" if signal == "BUY" else "🔴"
     lines = [
-        f"{emoji} <b>AURUM ENTRY — {signal}</b>",
-        f"Цена входа: <b>${price:.2f}</b>",
+        f"{emoji} <b>AURUM ENTRY — {pair}</b>",
+        f"Платформа: <b>{platform}</b> | {symbol}",
+        f"Цена входа: <b>${price:.4f}</b>" if price < 1000 else f"Цена входа: <b>${price:.2f}</b>",
         f"Confidence: <b>{confidence * 100:.1f}%</b>",
-        f"SL: <b>${sl:.1f}</b> | TP1: <b>${tp1:.1f}</b> | TP2: <b>${tp2:.1f}</b>",
+        f"SL: <b>${sl:.4f}</b> | TP1: <b>${tp1:.4f}</b> | TP2: <b>${tp2:.4f}</b>"
+        if price < 1000
+        else f"SL: <b>${sl:.1f}</b> | TP1: <b>${tp1:.1f}</b> | TP2: <b>${tp2:.1f}</b>",
     ]
     if rr_tp1 > 0:
         lines.append(f"R:R → TP1: <b>{rr_tp1:.2f}</b>")
     if rules_active > 0:
         lines.append(f"Консенсус: <b>{rules_active}/{total_rules}</b> правил")
-    lines.append(f"Размер: <b>{oz:.2f} oz</b> (риск от депозита)")
+    lines.append(f"Размер: <b>{oz:.4f} {size_label}</b> (риск от депозита)")
     if bar_time:
         lines.append(f"Бар: {bar_time}")
-    lines.append("\n⚡ Сигнал на вход — проверьте терминал или /balance")
+    lines.append("\n⚡ Сигнал на вход — проверьте Hash Hedge")
     return "\n".join(lines)
