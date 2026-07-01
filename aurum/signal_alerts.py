@@ -20,7 +20,8 @@ from aurum.config import (
     TRADE_COOLDOWN_BARS,
 )
 from aurum.data import fetch_asset_analysis_data, is_asset_session_active
-from aurum.thresholds import get_entry_thresholds, passes_strong_entry
+from aurum.entry_filters import passes_strong_entry
+from aurum.thresholds import get_entry_thresholds
 from aurum.execution.state import StateStore
 from aurum.features import calculate_indicators
 from aurum.hashhedge import hashhedge_pair_label, load_hashhedge_symbols, uses_ml_model

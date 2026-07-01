@@ -18,7 +18,8 @@ from aurum.execution.state import ExecutionState, ManagedTrade, StateStore
 from aurum.features import calculate_indicators
 from aurum.risk import calculate_trade_levels, position_size_oz
 from aurum.signals import process_signals
-from aurum.thresholds import get_entry_thresholds, passes_strong_entry
+from aurum.entry_filters import passes_strong_entry
+from aurum.thresholds import get_entry_thresholds
 from aurum.hashhedge import hashhedge_pair_label
 from aurum.signal_alerts import EntryOpportunity, send_entry_alert
 

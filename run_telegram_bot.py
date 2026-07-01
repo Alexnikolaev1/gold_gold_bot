@@ -28,6 +28,12 @@ if __name__ == "__main__":
     else:
         print("[AURUM TG] WARNING: ML training failed — /status and alerts disabled", flush=True)
     print("[AURUM TG] Entering polling loop...", flush=True)
-    if not run_polling():
-        print("[AURUM TG] FATAL: bot stopped (see errors above)", flush=True)
+    try:
+        if not run_polling():
+            print("[AURUM TG] FATAL: bot stopped (see errors above)", flush=True)
+            sys.exit(1)
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
         sys.exit(1)

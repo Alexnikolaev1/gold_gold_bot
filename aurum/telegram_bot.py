@@ -291,14 +291,17 @@ def run_polling() -> bool:
 
     stop_alerts = threading.Event()
     if TELEGRAM_ALERTS_ENABLED:
-        from aurum.signal_alerts import run_alert_loop
+        try:
+            from aurum.signal_alerts import run_alert_loop
 
-        threading.Thread(
-            target=run_alert_loop,
-            args=(stop_alerts, _log),
-            name="aurum-signal-alerts",
-            daemon=True,
-        ).start()
+            threading.Thread(
+                target=run_alert_loop,
+                args=(stop_alerts, _log),
+                name="aurum-signal-alerts",
+                daemon=True,
+            ).start()
+        except Exception as exc:
+            _log(f"Alert worker failed to start (commands still work): {exc}")
 
     offset = _load_offset()
     _log(f"Polling started (offset={offset})")
