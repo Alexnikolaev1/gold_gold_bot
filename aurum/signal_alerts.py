@@ -285,10 +285,10 @@ def run_alert_loop(stop_event: threading.Event, log_fn=None) -> None:
                 elif not warned_idle:
                     state = _load_alert_state()
                     pos = state.scan_offset
-                            _log(
-                                f"Hash Hedge scan OK — no max-confidence entry in batch "
-                                f"(offset {pos}/{len(symbols)})"
-                            )
+                    _log(
+                        f"Hash Hedge scan OK — no max-confidence entry in batch "
+                        f"(offset {pos}/{len(symbols)})"
+                    )
                     warned_idle = True
         except Exception as exc:
             logger.exception("Alert scan failed: %s", exc)
